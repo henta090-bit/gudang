@@ -744,7 +744,7 @@
                                                                 <p className="font-bold text-slate-800 text-sm truncate">{t.item}</p>
                                                                 <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-widest">{t.time} • @{t.user}</p>
                                                             </div>
-                                                            <div className={`shrink-0 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${t.type === 'IN' ? 'bg-emerald-100 text-emerald-800' : t.type === 'OUT' ? 'bg-orange-100 text-orange-800' : 'bg-indigo-100 text-indigo-800'}`}>
+                                                            <div className={`shrink-0 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${t.note?.includes('ADJUST') ? 'bg-indigo-100 text-indigo-800' : (t.type === 'IN' ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800')}`}>
                                                                 {t.type === 'OUT' ? '-' : '+'}{t.qty} <span className="opacity-50">{t.uom.substring(0,3)}</span>
                                                             </div>
                                                         </div>
@@ -792,11 +792,14 @@
                                                 <tbody className="divide-y divide-slate-100 font-medium">
                                                     {currentOpnameItems.map((item) => (
                                                         <tr key={item.id} className={`transition-all ${item.opnamedToday ? 'bg-emerald-50/10' : 'hover:bg-slate-50'}`}>
-                                                            <td className="px-4 py-3">
+                                                            <td className="px-4 py-3 cursor-pointer" onClick={() => { 
+                                                                const inputEl = document.getElementById(`opname-input-${item.id}`);
+                                                                if(inputEl) inputEl.focus(); 
+                                                            }}>
                                                                 <p className="font-bold text-slate-800 text-sm truncate max-w-[200px] md:max-w-xs">{item.name}</p>
                                                                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{item.id}</p>
                                                             </td>
-                                                            {userRole==='ADMIN' && <td className="px-4 py-3 text-right font-mono text-slate-500 text-sm">{item.stok}</td>}
+                                                            {userRole==='ADMIN' && <td className="px-4 py-3 text-right font-mono text-slate-500 text-[10px] whitespace-nowrap">{getStokInfo(item.stok, item.isiSlop, item.isiBal)}</td>}
                                                             <td className="px-4 py-3 text-center">
                                                                 {item.opnamedToday ? (
                                                                     <div className="flex flex-col items-center">
@@ -811,15 +814,27 @@
                                                             </td>
                                                             <td className="px-4 py-3">
                                                                 <div className="flex items-center justify-end gap-1.5">
-                                                                    <input type="number" min="0" placeholder={item.opnamedToday ? item.stok : "Qty"} 
+                                                                    <input 
+                                                                        id={`opname-input-${item.id}`}
+                                                                        type="number" min="0" placeholder={item.opnamedToday ? item.stok : "Qty"} 
                                                                         className="w-16 px-2 py-2 bg-white border border-slate-200 rounded-lg text-center font-bold text-sm outline-none focus:border-indigo-400 transition-all shadow-sm"
-                                                                        value={inlineOpnameQty[item.id] !== undefined ? inlineOpnameQty[item.id] : ''} onChange={(e) => handleInlineOpnameChange(item.id, e.target.value)} />
-                                                                    <select value={inlineOpnameUom[item.id] || 'Bal'} onChange={(e) => setInlineOpnameUom(prev => ({...prev, [item.id]: e.target.value}))}
+                                                                        value={inlineOpnameQty[item.id] !== undefined ? inlineOpnameQty[item.id] : ''} 
+                                                                        onChange={(e) => handleInlineOpnameChange(item.id, e.target.value)} 
+                                                                    />
+                                                                    <select 
+                                                                        value={inlineOpnameUom[item.id] || 'Bal'} 
+                                                                        onChange={(e) => setInlineOpnameUom(prev => ({...prev, [item.id]: e.target.value}))}
                                                                         className="w-16 bg-white border border-slate-200 py-2 px-1 rounded-lg font-bold text-[10px] text-slate-700 outline-none cursor-pointer appearance-none text-center shadow-sm">
-                                                                        <option value="Bal">BAL</option><option value="Slop">SLOP</option><option value="Bungkus">BKS</option>
+                                                                        <option value="Bal">BAL</option>
+                                                                        <option value="Slop">SLOP</option>
+                                                                        <option value="Bungkus">BKS</option>
                                                                     </select>
-                                                                    <button onClick={() => simpanInlineOpname(item)} disabled={inlineOpnameQty[item.id] === undefined || inlineOpnameQty[item.id] === '' || isSyncing}
-                                                                        className="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700 disabled:opacity-20 transition-all shadow-sm"><Icon name="save" size={16} /></button>
+                                                                    <button 
+                                                                        onClick={() => simpanInlineOpname(item)} 
+                                                                        disabled={inlineOpnameQty[item.id] === undefined || inlineOpnameQty[item.id] === '' || isSyncing}
+                                                                        className="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700 disabled:opacity-20 transition-all shadow-sm">
+                                                                        <Icon name="save" size={16} />
+                                                                    </button>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -840,7 +855,7 @@
                                 </div>
                             )}
 
-                            {/* MASTER BARANG VIEW (FIXED IPAD SCROLLING & PAGINATION) */}
+                            {/* MASTER BARANG VIEW */}
                             {activeMenu === 'inventory' && userRole === 'ADMIN' && (
                                 <div className="fade-in flex flex-col h-full w-full gap-4 min-h-0 pb-4">
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
@@ -864,8 +879,8 @@
                                                     {currentMasterItems.map((item, idx) => (
                                                         <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
                                                             <td className="px-4 py-3 font-bold text-slate-800 text-sm">{item.name}<br/><span className="text-[9px] text-indigo-400 uppercase tracking-widest">{item.id}</span></td>
-                                                            <td className="px-4 py-3 font-mono text-[9px] text-slate-500 leading-relaxed">Bks: {item.bBungkus}<br/>Slop: {item.bSlop || '-'}<br/>Bal: {item.bBal || '-'}</td>
-                                                            <td className="px-4 py-3 text-center"><span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-lg uppercase whitespace-nowrap">1 Bal = {item.isiBal} Slop x {item.isiSlop} Bks</span></td>
+                                                            <td className="px-4 py-3 font-mono text-[9px] text-slate-500 leading-relaxed">Bks: {item.bBungkus}<br/>Pak: {item.bSlop || '-'}<br/>Bal: {item.bBal || '-'}</td>
+                                                            <td className="px-4 py-3 text-center"><span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-lg uppercase whitespace-nowrap">1 Bal = {item.isiBal} Pak x {item.isiSlop} Bks</span></td>
                                                             <td className="px-4 py-3 text-right font-black text-base text-slate-800">{item.stok} <span className="text-[9px] text-slate-400 font-bold">BKS</span><br/><span className="text-[9px] text-emerald-600 font-bold whitespace-nowrap">{getStokInfo(item.stok, item.isiSlop, item.isiBal)}</span></td>
                                                             <td className="px-4 py-3 text-center space-x-2 whitespace-nowrap">
                                                                 <button onClick={()=>{
