@@ -36,12 +36,8 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
         
-        /**
-         * Komponen Icon yang Aman untuk React 18.
-         */
         const Icon = ({ name, size = 20, className = "" }) => {
             const iconRef = useRef(null);
-
             useEffect(() => {
                 if (window.lucide && iconRef.current) {
                     iconRef.current.innerHTML = `<i data-lucide="${name}"></i>`;
@@ -51,7 +47,6 @@
                     });
                 }
             }, [name, size, className]);
-
             return <span ref={iconRef} className={`inline-flex items-center justify-center ${className}`} style={{ width: size, height: size }}></span>;
         };
 
@@ -60,7 +55,6 @@
             // MASUKKAN URL DEPLOYMENT GOOGLE APPS SCRIPT ANDA DI SINI
             const API_URL = "https://script.google.com/macros/s/AKfycbwolB1qiZh8mTgngPufaSiYHfu8LcDYBf_kQjueOxAme-ADXZq8WGS6xEYiB0ilfMSQ/exec";
 
-            // --- STATE AUTH ---
             const [currentUser, setCurrentUser] = useState(localStorage.getItem('pos_user') || '');
             const [userRole, setUserRole] = useState(localStorage.getItem('pos_role') || 'ADMIN');
             const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('pos_user'));
@@ -68,7 +62,6 @@
             const [loginPassword, setLoginPassword] = useState('');
             const [loginError, setLoginError] = useState('');
 
-            // --- STATE UTAMA ---
             const [activeMenu, setActiveMenu] = useState(() => localStorage.getItem('pos_role') === 'STAFF' ? 'opname' : 'dashboard');
             const [liveData, setLiveData] = useState(null);
             const [isLoading, setIsLoading] = useState(false);
@@ -77,10 +70,9 @@
             const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
             const [searchTerm, setSearchTerm] = useState('');
 
-            // Tracker Sinkronisasi untuk Auto-Refresh & Anti Double-Submit
             const syncRef = useRef(false);
 
-            // --- STATE FORM & MODAL ---
+            // STATE FORM & MODAL
             const [scanBarcode, setScanBarcode] = useState('');
             const [scanType, setScanType] = useState('IN');
             const [adjustDir, setAdjustDir] = useState('MINUS');
@@ -90,14 +82,22 @@
             
             const [opnameBarcode, setOpnameBarcode] = useState('');
             const [opnameQty, setOpnameQty] = useState('');
-            const [opnameUom, setOpnameUom] = useState('Bungkus');
+            const [opnameUom, setOpnameUom] = useState('Bal'); // Default Bal
             
-            // Pencarian Cepat (Ketik Nama)
             const [detectedItem, setDetectedItem] = useState(null);
             const [scanSuggestions, setScanSuggestions] = useState([]);
             
             const [opnameItem, setOpnameItem] = useState(null);
             const [opnameSuggestions, setOpnameSuggestions] = useState([]);
+
+            // State Input Inline Tabel Opname
+            const [inlineOpnameQty, setInlineOpnameQty] = useState({});
+            const [inlineOpnameUom, setInlineOpnameUom] = useState({});
+
+            // Fitur Sortir & Paginasi Stok Opname
+            const [sortConfigOpname, setSortConfigOpname] = useState({ key: 'name', direction: 'asc' });
+            const [currentPageOpname, setCurrentPageOpname] = useState(1);
+            const itemsPerPageOpname = 50; // Ringan untuk ribuan data
 
             const [filterDate, setFilterDate] = useState('');
             const [filterType, setFilterType] = useState('ALL');
@@ -114,14 +114,13 @@
             const [isEditUserMode, setIsEditUserMode] = useState(false);
             const [newUser, setNewUser] = useState({ oldUsername: '', username: '', password: '', role: 'STAFF' });
 
-            // --- STATE SCANNER KAMERA ---
             const [isScannerOpen, setIsScannerOpen] = useState(false);
             const [scannerTarget, setScannerTarget] = useState(null); 
             const scannerRef = useRef(null);
 
             const barcodeInputRef = useRef(null);
 
-            // --- DATA FETCHING (AUTO-REFRESH TIAP 10 DETIK) ---
+            // --- DATA FETCHING (AUTO-REFRESH DIKURANGI JADI 30 DETIK) ---
             const fetchData = async (silent = false) => {
                 if (!API_URL.startsWith("http")) { setIsSyncing(false); return; }
                 if (syncRef.current && silent) return; 
@@ -136,41 +135,28 @@
                     setLiveData(data);
                 } catch (e) { console.error("Auto-sync error:", e); }
                 finally { 
-                    setIsLoading(false); 
-                    setIsSyncing(false); 
-                    setIsCheckingSystem(false); 
-                    syncRef.current = false;
+                    setIsLoading(false); setIsSyncing(false); setIsCheckingSystem(false); syncRef.current = false;
                 }
             };
 
             useEffect(() => { 
                 fetchData(); 
-                const interval = setInterval(() => { fetchData(true); }, 10000);
+                const interval = setInterval(() => { fetchData(true); }, 30000); // 30 DETIK UNTUK MENCEGAH LAG
                 return () => clearInterval(interval);
             }, []);
 
-            // --- LOGIKA PENDETEKSI KAMERA KHUSUS BARCODE ---
+            // --- LOGIKA PENDETEKSI KAMERA ---
             useEffect(() => {
                 if (isScannerOpen) {
                     const formats = window.Html5QrcodeSupportedFormats ? [
-                        window.Html5QrcodeSupportedFormats.EAN_13,
-                        window.Html5QrcodeSupportedFormats.EAN_8,
-                        window.Html5QrcodeSupportedFormats.UPC_A,
-                        window.Html5QrcodeSupportedFormats.UPC_E,
-                        window.Html5QrcodeSupportedFormats.CODE_128,
-                        window.Html5QrcodeSupportedFormats.CODE_39,
+                        window.Html5QrcodeSupportedFormats.EAN_13, window.Html5QrcodeSupportedFormats.EAN_8,
+                        window.Html5QrcodeSupportedFormats.UPC_A, window.Html5QrcodeSupportedFormats.UPC_E,
+                        window.Html5QrcodeSupportedFormats.CODE_128, window.Html5QrcodeSupportedFormats.CODE_39,
                         window.Html5QrcodeSupportedFormats.QR_CODE
                     ] : undefined;
 
                     const html5QrcodeScanner = new Html5QrcodeScanner(
-                        "reader",
-                        { 
-                            fps: 10, 
-                            qrbox: { width: 280, height: 120 }, 
-                            aspectRatio: 1.0, 
-                            formatsToSupport: formats
-                        },
-                        false
+                        "reader", { fps: 10, qrbox: { width: 280, height: 120 }, aspectRatio: 1.0, formatsToSupport: formats }, false
                     );
                     scannerRef.current = html5QrcodeScanner;
                     
@@ -182,20 +168,12 @@
                         else if (scannerTarget === 'master_bal') setNewMaster(prev => ({ ...prev, barcodeBal: decodedText }));
                         
                         try { navigator.vibrate && navigator.vibrate(200); } catch(e){}
-                        
-                        html5QrcodeScanner.clear();
-                        setIsScannerOpen(false);
+                        html5QrcodeScanner.clear(); setIsScannerOpen(false);
                     }, (error) => {});
                 }
-
-                return () => {
-                    if (scannerRef.current) {
-                        scannerRef.current.clear().catch(e => console.error(e));
-                    }
-                };
+                return () => { if (scannerRef.current) scannerRef.current.clear().catch(e => console.error(e)); };
             }, [isScannerOpen, scannerTarget]);
 
-            // --- LOGIKA PENCARIAN CEPAT & BARCODE KETIK ---
             const findItemExact = (inputStr) => {
                 const clean = String(inputStr).trim().toLowerCase();
                 if (!clean || !liveData?.masterItems) return null;
@@ -203,8 +181,8 @@
                     if (String(item.bBungkus).trim().toLowerCase() === clean) return { ...item, defaultUom: 'Bungkus' };
                     if (String(item.bSlop).trim().toLowerCase() === clean) return { ...item, defaultUom: 'Slop' };
                     if (String(item.bBal).trim().toLowerCase() === clean) return { ...item, defaultUom: 'Bal' };
-                    if (String(item.name).trim().toLowerCase() === clean) return { ...item, defaultUom: 'Bungkus' };
-                    if (String(item.id).trim().toLowerCase() === clean) return { ...item, defaultUom: 'Bungkus' };
+                    if (String(item.name).trim().toLowerCase() === clean) return { ...item, defaultUom: 'Bal' };
+                    if (String(item.id).trim().toLowerCase() === clean) return { ...item, defaultUom: 'Bal' };
                 }
                 return null;
             };
@@ -212,53 +190,70 @@
             useEffect(() => {
                 const found = findItemExact(scanBarcode);
                 setDetectedItem(found);
-                if(found) {
-                    setScanUom(found.defaultUom);
-                    setScanSuggestions([]);
-                } else {
+                if(found) { setScanUom(found.defaultUom); setScanSuggestions([]); } 
+                else {
                     const lowerInput = scanBarcode.toLowerCase().trim();
                     if(lowerInput.length > 0) {
                         const suggestions = liveData?.masterItems?.filter(i => 
-                            String(i.name).toLowerCase().includes(lowerInput) || 
-                            String(i.id).toLowerCase().includes(lowerInput) ||
-                            String(i.bBungkus).includes(lowerInput)
+                            String(i.name).toLowerCase().includes(lowerInput) || String(i.id).toLowerCase().includes(lowerInput) || String(i.bBungkus).includes(lowerInput)
                         ).slice(0, 5) || [];
                         setScanSuggestions(suggestions);
-                    } else {
-                        setScanSuggestions([]);
-                    }
+                    } else { setScanSuggestions([]); }
                 }
             }, [scanBarcode, liveData]);
 
             useEffect(() => {
                 const found = findItemExact(opnameBarcode);
                 setOpnameItem(found);
-                if(found) {
-                    setOpnameUom(found.defaultUom);
-                    setOpnameSuggestions([]);
-                } else {
+                if(found) { setOpnameUom(found.defaultUom); setOpnameSuggestions([]); } 
+                else {
                     const lowerInput = opnameBarcode.toLowerCase().trim();
                     if(lowerInput.length > 0) {
                         const suggestions = liveData?.masterItems?.filter(i => 
-                            String(i.name).toLowerCase().includes(lowerInput) || 
-                            String(i.id).toLowerCase().includes(lowerInput) ||
-                            String(i.bBungkus).includes(lowerInput)
+                            String(i.name).toLowerCase().includes(lowerInput) || String(i.id).toLowerCase().includes(lowerInput) || String(i.bBungkus).includes(lowerInput)
                         ).slice(0, 5) || [];
                         setOpnameSuggestions(suggestions);
-                    } else {
-                        setOpnameSuggestions([]);
-                    }
+                    } else { setOpnameSuggestions([]); }
                 }
             }, [opnameBarcode, liveData]);
 
-            // --- LOGIKA FILTER PENCARIAN (TABEL) ---
+            // --- FILTER & SORTING ---
+            useEffect(() => { setCurrentPageOpname(1); }, [searchTerm, activeMenu]);
+
             const filteredMasterItems = (liveData?.masterItems || []).filter(i => 
                 i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                 i.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                String(i.bBungkus).includes(searchTerm) ||
-                String(i.bSlop).includes(searchTerm) ||
-                String(i.bBal).includes(searchTerm)
+                String(i.bBungkus).includes(searchTerm)
             );
+
+            // Logika Sortir Stok Opname
+            let sortedOpnameItems = [...filteredMasterItems];
+            if (sortConfigOpname.key) {
+                sortedOpnameItems.sort((a, b) => {
+                    if (sortConfigOpname.key === 'name') {
+                        return sortConfigOpname.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+                    }
+                    if (sortConfigOpname.key === 'status') {
+                        const aVal = a.opnamedToday ? 1 : 0;
+                        const bVal = b.opnamedToday ? 1 : 0;
+                        return sortConfigOpname.direction === 'asc' ? aVal - bVal : bVal - aVal;
+                    }
+                    if (sortConfigOpname.key === 'stok') {
+                        return sortConfigOpname.direction === 'asc' ? a.stok - b.stok : b.stok - a.stok;
+                    }
+                    return 0;
+                });
+            }
+
+            // Logika Paginasi (Pagination)
+            const totalPagesOpname = Math.ceil(sortedOpnameItems.length / itemsPerPageOpname) || 1;
+            const currentOpnameItems = sortedOpnameItems.slice((currentPageOpname - 1) * itemsPerPageOpname, currentPageOpname * itemsPerPageOpname);
+
+            const handleSortOpname = (key) => {
+                let direction = 'asc';
+                if (sortConfigOpname.key === key && sortConfigOpname.direction === 'asc') direction = 'desc';
+                setSortConfigOpname({ key, direction });
+            };
             
             const filteredTransactions = (liveData?.transactions || []).filter(t => {
                 const mSearch = t.item.toLowerCase().includes(searchTerm.toLowerCase()) || t.user.toLowerCase().includes(searchTerm.toLowerCase());
@@ -270,100 +265,80 @@
                 return mSearch && mDate && mType;
             });
 
-            const filteredLowStock = (liveData?.lowStock || []).filter(item => 
-                item.name.toLowerCase().includes(searchTerm.toLowerCase())
-            );
+            const filteredLowStock = (liveData?.lowStock || []).filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-            // Perhitungan Mundur Kartu Stok
             const getKartuStokData = () => {
                 if (!kartuStokItem) return [];
                 const selectedItemData = liveData?.masterItems?.find(i => i.id === kartuStokItem);
                 if (!selectedItemData) return [];
-                
                 let currentSisa = selectedItemData.stok || 0;
                 const logs = [...(liveData?.transactions || [])].filter(t => t.item === selectedItemData.name);
-                
                 return logs.map(trx => {
                     let qtyBase = Number(trx.qty);
                     if (trx.uom === 'Bal') qtyBase = Number(trx.qty) * selectedItemData.isiSlop * selectedItemData.isiBal;
                     if (trx.uom === 'Slop') qtyBase = Number(trx.qty) * selectedItemData.isiSlop;
-                    
-                    const isMasuk = trx.type === 'IN';
-                    const isKeluar = trx.type === 'OUT';
-                    
-                    const row = {
-                        ...trx,
-                        masukBase: isMasuk ? qtyBase : 0,
-                        keluarBase: isKeluar ? qtyBase : 0,
-                        sisa: currentSisa
-                    };
-                    if (isMasuk) currentSisa -= qtyBase;
-                    if (isKeluar) currentSisa += qtyBase;
+                    const isMasuk = trx.type === 'IN'; const isKeluar = trx.type === 'OUT';
+                    const row = { ...trx, masukBase: isMasuk ? qtyBase : 0, keluarBase: isKeluar ? qtyBase : 0, sisa: currentSisa };
+                    if (isMasuk) currentSisa -= qtyBase; if (isKeluar) currentSisa += qtyBase;
                     return row;
                 });
             };
 
-            // --- HANDLERS UTAMA ---
             const handleLogin = (e) => {
                 e.preventDefault();
+                if (!liveData || !liveData.users) { setLoginError("Sistem belum siap, mohon tunggu sebentar..."); return; }
                 const found = liveData?.users?.find(u => u.username.toLowerCase() === loginName.trim().toLowerCase() && u.password === loginPassword);
                 if (found) {
-                    localStorage.setItem('pos_user', found.username);
-                    localStorage.setItem('pos_role', found.role);
-                    setCurrentUser(found.username);
-                    setUserRole(found.role);
-                    setIsLoggedIn(true);
-                    setActiveMenu(found.role === 'STAFF' ? 'opname' : 'dashboard');
+                    localStorage.setItem('pos_user', found.username); localStorage.setItem('pos_role', found.role);
+                    setCurrentUser(found.username); setUserRole(found.role); setIsLoggedIn(true); setActiveMenu(found.role === 'STAFF' ? 'opname' : 'dashboard');
                 } else { setLoginError("ID atau PIN tidak terdaftar!"); }
             };
 
-            const handleLogout = () => {
-                localStorage.clear();
-                location.reload();
-            };
+            const handleLogout = () => { localStorage.clear(); location.reload(); };
 
             const apiCall = async (payload) => {
-                syncRef.current = true;
-                setIsSyncing(true);
+                syncRef.current = true; setIsSyncing(true);
                 try {
                     const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
                     const result = await res.json();
-                    if(result.status === 'success') {
-                        syncRef.current = false;
-                        fetchData(true);
-                        return true;
-                    }
-                } catch(e) { console.error("API Call error:", e); }
-                
-                syncRef.current = false;
-                fetchData(true);
-                return false;
+                    if(result.status === 'success') { syncRef.current = false; fetchData(true); return true; }
+                } catch(e) { console.error("API Call error:", e); setCustomAlert("Terjadi kesalahan koneksi saat menyimpan data. Coba lagi."); }
+                syncRef.current = false; fetchData(true); return false;
             };
 
-            // ⚡ OPTIMISTIC UI: HAPUS FORM SECARA INSTAN
             const simpanScan = async (e) => {
                 e.preventDefault();
                 if(syncRef.current || !detectedItem) return;
-                
                 const payload = { action: 'scan', barcode: detectedItem.id, type: scanType === 'ADJUST' ? (adjustDir === 'MINUS' ? 'OUT' : 'IN') : scanType, qty: scanQty, uom: scanUom, user: currentUser, note: scanType === 'ADJUST' ? `ADJUST: ${scanNote}` : '' };
-                
-                setScanBarcode(''); setScanQty(1); setScanNote('');
-                setDetectedItem(null); setScanSuggestions([]);
-                
+                setScanBarcode(''); setScanQty(1); setScanNote(''); setDetectedItem(null); setScanSuggestions([]);
                 await apiCall(payload);
             };
 
             const simpanOpname = async (e) => {
                 e.preventDefault();
                 if(syncRef.current || !opnameItem) return;
-                
                 const payload = { action: 'opname', barcode: opnameItem.id, qty: opnameQty, uom: opnameUom, user: currentUser };
-                
-                setOpnameBarcode(''); setOpnameQty('');
-                setOpnameItem(null); setOpnameSuggestions([]);
+                setOpnameBarcode(''); setOpnameQty(''); setOpnameItem(null); setOpnameSuggestions([]);
                 if(barcodeInputRef.current) barcodeInputRef.current.focus();
-
                 await apiCall(payload);
+            };
+
+            const handleInlineOpnameChange = (id, value) => {
+                setInlineOpnameQty(prev => ({ ...prev, [id]: value }));
+            };
+
+            const simpanInlineOpname = async (item) => {
+                const qty = inlineOpnameQty[item.id];
+                const uom = inlineOpnameUom[item.id] || 'Bal'; // Menggunakan BAL sebagai Default List
+                if (qty === undefined || qty === '') return;
+                if (syncRef.current) return;
+
+                const payload = { action: 'opname', barcode: item.id, qty: qty, uom: uom, user: currentUser };
+                
+                // Optimistic UI
+                setInlineOpnameQty(prev => ({ ...prev, [item.id]: '' }));
+                await apiCall(payload);
+                setCustomAlert(`Stok fisik ${item.name} berhasil disimpan!`);
             };
 
             const simpanMaster = async (e) => {
@@ -377,38 +352,6 @@
                 if (syncRef.current) return;
                 const success = await apiCall({ action: 'delete_master', idBarang: deleteTarget });
                 if(success) { setDeleteTarget(null); setCustomAlert("Produk telah dihapus."); }
-            };
-
-            const handleExportCSV = (type) => {
-                let csvRows = [];
-                let filename = "";
-                
-                if (type === 'mutasi') {
-                    const headers = ["Tanggal", "Waktu", "Tipe", "Produk", "Jumlah", "Satuan", "Operator", "Catatan"];
-                    csvRows = [headers.join(","), ...filteredTransactions.map(t => `"${t.date}","${t.time}","${t.type}","${t.item}","${t.qty}","${t.uom}","${t.user}","${t.note}"`)];
-                    filename = `Mutasi_Harian_${new Date().toISOString().split('T')[0]}.csv`;
-                } else if (type === 'rekap_selisih') {
-                    const headers = ["Nama Produk", "SKU", "Status", "Sistem", "Fisik", "Selisih"];
-                    csvRows = [headers.join(","), ...(filteredMasterItems).map(i => {
-                        const isDone = i.opnamedToday;
-                        const selisih = i.selisihOpname;
-                        const fisik = isDone ? i.stok : '-';
-                        const stokSistemSebelum = isDone ? (i.stok - selisih) : i.stok;
-                        return `"${i.name}","${i.id}","${isDone ? 'SELESAI' : 'BELUM'}","${stokSistemSebelum}","${fisik}","${isDone ? selisih : '-'}"`
-                    })];
-                    filename = `Laporan_Selisih_Opname_${new Date().toISOString().split('T')[0]}.csv`;
-                } else if (type === 'kartu') {
-                    if (!kartuStokItem) return setCustomAlert("Pilih barang terlebih dahulu di menu dropdown Kartu Stok.");
-                    const kartuData = getKartuStokData();
-                    const selectedItem = liveData?.masterItems?.find(i => i.id === kartuStokItem);
-                    const headers = ["Tanggal", "Waktu", "No Bukti", "Keterangan", "Masuk (Bks)", "Keluar (Bks)", "Sisa Saldo (Bks)", "Operator"];
-                    csvRows = [headers.join(","), ...kartuData.map(t => `"${t.date}","${t.time}","${t.id}","${t.note}","${t.masukBase}","${t.keluarBase}","${t.sisa}","${t.user}"`)];
-                    filename = `Kartu_Stok_${selectedItem?.name}.csv`;
-                }
-                
-                if (csvRows.length <= 1) return setCustomAlert("Data kosong atau belum dipilih.");
-                const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
-                const a = document.createElement("a"); a.href = window.URL.createObjectURL(blob); a.download = filename; a.click();
             };
 
             const getStokInfo = (bks, iS, iB) => {
@@ -425,7 +368,6 @@
                 return res.join(" + ");
             };
 
-            // --- UI: LOGIN VIEW ---
             if (!isLoggedIn) {
                 return (
                     <div className="flex h-screen items-center justify-center p-6 bg-slate-100 relative overflow-hidden">
@@ -467,7 +409,7 @@
 
             return (
                 <div className="flex h-screen overflow-hidden relative font-sans">
-                    {/* SIDEBAR */}
+                    {/* SIDEBAR DENGAN FONT LEBIH TAJAM */}
                     {isMobileMenuOpen && <div className="absolute inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-sm" onClick={()=>setIsMobileMenuOpen(false)}></div>}
                     <aside className={`absolute md:relative z-50 w-72 h-full bg-indigo-950 text-white flex flex-col shadow-2xl transition-transform duration-500 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} shrink-0`}>
                         <div className="p-10 border-b border-white/5 flex flex-col items-center">
@@ -477,7 +419,7 @@
                         </div>
                         <nav className="flex-1 p-6 space-y-2 overflow-y-auto no-scrollbar">
                             {menuList.map(m => (
-                                <button key={m.id} onClick={()=>{setActiveMenu(m.id); setIsMobileMenuOpen(false);}} className={`w-full flex items-center gap-4 p-4 md:p-5 rounded-[1.2rem] font-bold text-xs md:text-sm tracking-wider transition-all ${activeMenu === m.id ? 'bg-white text-indigo-900 shadow-xl scale-[1.03]' : 'text-indigo-200 hover:text-white hover:bg-white/10'}`}>
+                                <button key={m.id} onClick={()=>{setActiveMenu(m.id); setIsMobileMenuOpen(false);}} className={`w-full flex items-center gap-4 p-4 md:p-5 rounded-[1.2rem] font-bold text-sm tracking-wider transition-all ${activeMenu === m.id ? 'bg-white text-indigo-900 shadow-xl scale-[1.03]' : 'text-indigo-200 hover:text-white hover:bg-white/10'}`}>
                                     <Icon name={m.icon} size={20} /> {m.label}
                                 </button>
                             ))}
@@ -569,7 +511,6 @@
                                                             <Icon name="camera" size={20}/>
                                                         </button>
                                                         
-                                                        {/* QUICK SEARCH DROPDOWN */}
                                                         {scanSuggestions.length > 0 && !detectedItem && (
                                                             <ul className="absolute z-50 w-full bg-white border border-slate-200 shadow-2xl rounded-2xl mt-2 max-h-60 overflow-y-auto no-scrollbar divide-y divide-slate-100">
                                                                 {scanSuggestions.map(item => (
@@ -585,7 +526,7 @@
                                                         <input type="number" min="1" value={scanQty} onChange={(e)=>setScanQty(e.target.value)} className="w-24 px-3 py-5 bg-slate-50 border-2 border-slate-200 rounded-[1.5rem] focus:bg-white focus:border-indigo-400 text-center font-black text-2xl outline-none" />
                                                         <div className="w-32 relative">
                                                             <select value={scanUom} onChange={(e)=>setScanUom(e.target.value)} className="w-full h-full px-5 py-5 bg-white border-2 border-slate-200 rounded-[1.5rem] font-black text-xs text-slate-700 outline-none cursor-pointer uppercase tracking-widest appearance-none shadow-sm focus:border-indigo-500">
-                                                                <option value="Bungkus">Bks</option><option value="Slop">Slop</option><option value="Bal">Bal</option>
+                                                                <option value="Bungkus">Bks</option><option value="Slop">Pak</option><option value="Bal">Bal</option>
                                                             </select>
                                                             <div className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none"><Icon name="chevron-right" size={18} /></div>
                                                         </div>
@@ -630,11 +571,11 @@
                                 </div>
                             )}
 
-                            {/* OPNAME VIEW (WITH BLIND COUNT & CLICKABLE ROWS) */}
+                            {/* OPNAME VIEW (WITH SORTING, PAGINATION, AND INLINE EDITING) */}
                             {activeMenu === 'opname' && (
                                 <div className="fade-in flex flex-col lg:flex-row gap-8">
                                     <div className="w-full lg:w-1/3 space-y-6">
-                                        <h2 className="text-2xl font-black italic uppercase text-slate-800">Audit Fisik Rak</h2>
+                                        <h2 className="text-2xl font-black italic uppercase text-slate-800">Cari & Set Opname</h2>
                                         <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-200 text-slate-800 sticky top-6">
                                             <form onSubmit={simpanOpname} className="space-y-8 text-center">
                                                 <div className="text-left space-y-2 relative">
@@ -642,13 +583,10 @@
                                                     <div className="relative">
                                                         <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"><Icon name="search" size={20} /></div>
                                                         <input ref={barcodeInputRef} required autoFocus className="w-full pl-14 pr-14 py-5 bg-slate-50 border-2 border-slate-200 rounded-[1.8rem] focus:bg-white focus:border-indigo-400 font-bold outline-none shadow-inner text-sm transition-all" placeholder="Ketik/Scan..." value={opnameBarcode} onChange={e=>setOpnameBarcode(e.target.value)} autoComplete="off" />
-                                                        
                                                         <button type="button" onClick={() => { setScannerTarget('opname'); setIsScannerOpen(true); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-600 hover:text-indigo-800 bg-indigo-100 p-2.5 rounded-xl transition-all">
                                                             <Icon name="camera" size={20}/>
                                                         </button>
                                                     </div>
-
-                                                    {/* QUICK SEARCH DROPDOWN */}
                                                     {opnameSuggestions.length > 0 && !opnameItem && (
                                                         <ul className="absolute z-50 w-full bg-white border border-slate-200 shadow-2xl rounded-2xl mt-2 max-h-60 overflow-y-auto no-scrollbar divide-y divide-slate-100">
                                                             {opnameSuggestions.map(item => (
@@ -672,7 +610,7 @@
                                                                 <input required type="number" min="0" className="w-24 bg-white/10 border border-white/20 p-5 rounded-2xl font-black text-3xl text-center text-white outline-none focus:border-indigo-400 transition-colors" value={opnameQty} onChange={e=>setOpnameQty(e.target.value)} />
                                                                 <div className="flex-1 relative">
                                                                     <select value={opnameUom} onChange={e=>setOpnameUom(e.target.value)} className="w-full h-full bg-white border-2 border-transparent p-4 rounded-2xl font-black text-sm text-slate-800 outline-none cursor-pointer appearance-none">
-                                                                        <option value="Bungkus">BUNGKUS</option><option value="Slop">SLOP</option><option value="Bal">BAL</option>
+                                                                        <option value="Bungkus">BUNGKUS</option><option value="Slop">PAK/SLOP</option><option value="Bal">BAL</option>
                                                                     </select>
                                                                     <Icon name="chevron-right" className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" size={18}/>
                                                                 </div>
@@ -680,7 +618,7 @@
                                                         </div>
                                                     </div>
                                                 )}
-                                                <button disabled={!opnameItem || opnameQty === '' || isSyncing} className="w-full bg-indigo-600 text-white font-black py-6 rounded-[2rem] shadow-xl uppercase tracking-widest disabled:opacity-30 active:scale-95 transition-all text-sm hover:bg-indigo-700">Konfirmasi Fisik</button>
+                                                <button disabled={!opnameItem || opnameQty === '' || isSyncing} className="w-full bg-indigo-600 text-white font-black py-6 rounded-[2rem] shadow-xl uppercase tracking-widest disabled:opacity-30 active:scale-95 transition-all text-sm hover:bg-indigo-700">Simpan Fisik</button>
                                             </form>
                                         </div>
                                     </div>
@@ -690,34 +628,87 @@
                                             <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 transition-all duration-1000 shadow-sm" style={{width: `${Math.round((liveData?.masterItems.filter(i=>i.opnamedToday).length / liveData?.masterItems.length) * 100 || 0)}%`}}></div></div>
                                         </div>
                                         <div className="bg-white rounded-[3rem] shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[500px]">
-                                            <div className="p-8 bg-slate-50/80 border-b border-slate-200 font-black text-xs uppercase tracking-widest text-slate-600">Status Pemeriksaan (Klik untuk Cek)</div>
+                                            <div className="p-8 bg-slate-50/80 border-b border-slate-200 flex justify-between items-center">
+                                                <span className="font-black text-xs uppercase tracking-widest text-slate-600">Daftar Opname & Revisi Fisik</span>
+                                                <span className="text-[10px] font-bold text-slate-400 italic">Isi langsung di tabel</span>
+                                            </div>
                                             <div className="overflow-x-auto flex-1">
-                                                <table className="w-full text-left min-w-[500px]">
+                                                <table className="w-full text-left min-w-[700px]">
                                                     <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 border-b border-slate-200">
-                                                        <tr><th className="p-6">PRODUK</th><th className="p-6 text-center">CEK</th>{userRole==='ADMIN' && <th className="p-6 text-right">SISTEM</th>}<th className="p-6 text-right">FISIK</th>{userRole==='ADMIN' && <th className="p-6 text-right">SELISIH</th>}</tr>
+                                                        <tr>
+                                                            <th className="p-6 cursor-pointer hover:bg-slate-200 transition-colors" onClick={() => handleSortOpname('name')}>
+                                                                PRODUK {sortConfigOpname.key === 'name' ? (sortConfigOpname.direction === 'asc' ? '↑' : '↓') : ''}
+                                                            </th>
+                                                            {userRole==='ADMIN' && 
+                                                            <th className="p-6 text-right cursor-pointer hover:bg-slate-200 transition-colors" onClick={() => handleSortOpname('stok')}>
+                                                                SISTEM {sortConfigOpname.key === 'stok' ? (sortConfigOpname.direction === 'asc' ? '↑' : '↓') : ''}
+                                                            </th>}
+                                                            <th className="p-6 text-center cursor-pointer hover:bg-slate-200 transition-colors" onClick={() => handleSortOpname('status')}>
+                                                                STATUS {sortConfigOpname.key === 'status' ? (sortConfigOpname.direction === 'asc' ? '↑' : '↓') : ''}
+                                                            </th>
+                                                            <th className="p-6 text-right min-w-[200px]">INPUT FISIK (BAL/PAK/BKS)</th>
+                                                        </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100 text-sm font-medium">
-                                                        {filteredMasterItems.map((item, idx) => (
-                                                            <tr key={idx} 
-                                                                onClick={() => {
-                                                                    setOpnameBarcode(item.name);
-                                                                    if(barcodeInputRef.current) barcodeInputRef.current.focus();
-                                                                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                                                                }}
-                                                                className={`cursor-pointer transition-all ${!item.opnamedToday ? 'opacity-60 hover:opacity-100 hover:bg-indigo-50' : 'hover:bg-slate-50'}`}>
-                                                                <td className="p-6 font-bold text-slate-800">{item.name}</td>
-                                                                <td className="p-6 text-center">{item.opnamedToday ? <Icon name="check-circle-2" className="text-emerald-500 mx-auto" size={20}/> : '-'}</td>
-                                                                {userRole==='ADMIN' && <td className="p-6 text-right font-mono text-slate-500">{item.opnamedToday ? item.stok - item.selisihOpname : item.stok}</td>}
-                                                                <td className="p-6 text-right font-black text-slate-800">{item.opnamedToday ? (userRole==='STAFF' ? 'TERKIRIM' : item.stok) : '-'}</td>
-                                                                {userRole==='ADMIN' && <td className="p-6 text-right font-black">
-                                                                    {item.opnamedToday ? (item.selisihOpname === 0 ? <span className="text-slate-400">SESUAI</span> : <span className={item.selisihOpname > 0 ? 'text-emerald-600' : 'text-rose-600'}>{item.selisihOpname > 0 ? '+' : ''}{item.selisihOpname}</span>) : '-'}
-                                                                </td>}
+                                                        {currentOpnameItems.map((item) => (
+                                                            <tr key={item.id} className={`transition-colors ${!item.opnamedToday ? 'opacity-80 hover:bg-slate-50' : 'bg-emerald-50/30 hover:bg-emerald-50'}`}>
+                                                                <td className="p-6 cursor-pointer" onClick={() => { setOpnameBarcode(item.name); if(barcodeInputRef.current) barcodeInputRef.current.focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+                                                                    <p className="font-bold text-slate-800">{item.name}</p>
+                                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{item.id}</p>
+                                                                </td>
+                                                                {userRole==='ADMIN' && <td className="p-6 text-right font-mono text-slate-500">{item.stok}</td>}
+                                                                <td className="p-6 text-center">
+                                                                    {item.opnamedToday ? <Icon name="check-circle-2" className="text-emerald-500 mx-auto" size={24}/> : <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">Belum Cek</span>}
+                                                                    {userRole==='ADMIN' && item.opnamedToday && item.selisihOpname !== 0 && (
+                                                                        <div className={`mt-2 text-[10px] font-black tracking-widest ${item.selisihOpname > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                                            Selisih: {item.selisihOpname > 0 ? '+' : ''}{item.selisihOpname}
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                                <td className="p-6">
+                                                                    <div className="flex items-center justify-end gap-2">
+                                                                        <input 
+                                                                            type="number" 
+                                                                            min="0"
+                                                                            placeholder={item.opnamedToday ? "Ubah" : "Qty"}
+                                                                            className="w-20 px-3 py-3 bg-white border-2 border-slate-200 rounded-xl text-center font-black text-sm outline-none focus:border-indigo-400 transition-all"
+                                                                            value={inlineOpnameQty[item.id] !== undefined ? inlineOpnameQty[item.id] : ''}
+                                                                            onChange={(e) => handleInlineOpnameChange(item.id, e.target.value)}
+                                                                        />
+                                                                        <select 
+                                                                            value={inlineOpnameUom[item.id] || 'Bal'} 
+                                                                            onChange={(e) => setInlineOpnameUom(prev => ({...prev, [item.id]: e.target.value}))}
+                                                                            className="w-20 bg-white border-2 border-slate-200 p-3 rounded-xl font-black text-xs text-slate-700 outline-none cursor-pointer appearance-none text-center"
+                                                                        >
+                                                                            <option value="Bungkus">Bks</option>
+                                                                            <option value="Slop">Pak</option>
+                                                                            <option value="Bal">Bal</option>
+                                                                        </select>
+                                                                        <button 
+                                                                            onClick={() => simpanInlineOpname(item)}
+                                                                            disabled={inlineOpnameQty[item.id] === undefined || inlineOpnameQty[item.id] === '' || isSyncing}
+                                                                            className="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-30 transition-all shadow-sm hover:shadow-md"
+                                                                        >
+                                                                            <Icon name="save" size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
                                                             </tr>
                                                         ))}
-                                                        {filteredMasterItems.length === 0 && <tr><td colSpan="5" className="p-10 text-center text-slate-400 font-bold">Produk tidak ditemukan.</td></tr>}
+                                                        {currentOpnameItems.length === 0 && <tr><td colSpan={userRole==='ADMIN'?4:3} className="p-10 text-center text-slate-400 font-bold">Produk tidak ditemukan.</td></tr>}
                                                     </tbody>
                                                 </table>
                                             </div>
+                                            {/* Paginasi Table Opname */}
+                                            {totalPagesOpname > 1 && (
+                                                <div className="flex justify-between items-center p-6 bg-slate-50 border-t border-slate-200 shrink-0">
+                                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Halaman {currentPageOpname} dari {totalPagesOpname}</span>
+                                                    <div className="flex gap-2">
+                                                        <button disabled={currentPageOpname === 1} onClick={() => setCurrentPageOpname(prev => prev - 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-100 disabled:opacity-30">Prev</button>
+                                                        <button disabled={currentPageOpname === totalPagesOpname} onClick={() => setCurrentPageOpname(prev => prev + 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-100 disabled:opacity-30">Next</button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
