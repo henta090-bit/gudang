@@ -76,7 +76,7 @@
             const [scanBarcode, setScanBarcode] = useState('');
             const [scanType, setScanType] = useState('IN');
             const [adjustDir, setAdjustDir] = useState('MINUS');
-            const [scanQty, setScanQty] = useState(1);
+            const [scanQty, setScanQty] = useState(''); // DIUBAH: Default dikosongkan agar ketik angka lebih mudah
             const [scanUom, setScanUom] = useState('Bungkus');
             const [scanNote, setScanNote] = useState('');
             
@@ -433,7 +433,7 @@
                 e.preventDefault();
                 if(syncRef.current || !detectedItem) return;
                 const payload = { action: 'scan', barcode: detectedItem.id, type: scanType === 'ADJUST' ? (adjustDir === 'MINUS' ? 'OUT' : 'IN') : scanType, qty: scanQty, uom: scanUom, user: currentUser, note: scanType === 'ADJUST' ? `ADJUST: ${scanNote}` : '' };
-                setScanBarcode(''); setScanQty(1); setScanNote(''); setDetectedItem(null); setScanSuggestions([]);
+                setScanBarcode(''); setScanQty(''); setScanNote(''); setDetectedItem(null); setScanSuggestions([]); // DIUBAH: Reset dikosongkan
                 await apiCall(payload);
             };
 
@@ -675,7 +675,7 @@
                                                                 )}
                                                             </div>
                                                             <div className="flex gap-2">
-                                                                <input type="number" min="1" value={scanQty} onChange={(e)=>setScanQty(e.target.value)} className="w-20 px-2 py-3 bg-slate-50 border border-slate-200 rounded-xl text-center font-black text-lg outline-none shadow-inner" />
+                                                                <input required type="number" min="1" placeholder="Qty" value={scanQty} onChange={(e)=>setScanQty(e.target.value)} className="w-20 px-2 py-3 bg-slate-50 border border-slate-200 rounded-xl text-center font-black text-lg outline-none shadow-inner" />
                                                                 <div className="w-24 relative">
                                                                     <select value={scanUom} onChange={(e)=>setScanUom(e.target.value)} className="w-full h-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-[10px] text-slate-700 outline-none cursor-pointer appearance-none shadow-sm">
                                                                         <option value="Bungkus">Bks</option><option value="Slop">Pak</option><option value="Bal">Bal</option>
@@ -716,7 +716,7 @@
                                                             </div>
                                                         ) : null}
                                                     </div>
-                                                    <button type="submit" disabled={!detectedItem || isSyncing} className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-black transition-all disabled:opacity-30 text-xs uppercase tracking-widest">SIMPAN MUTASI</button>
+                                                    <button type="submit" disabled={!detectedItem || isSyncing || !scanQty} className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-black transition-all disabled:opacity-30 text-xs uppercase tracking-widest">SIMPAN MUTASI</button>
                                                 </form>
                                             </div>
                                         </div>
