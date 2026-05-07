@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Grosir Pintar POS v2.5</title>
+    <title>Toko Bebeng POS</title>
     <!-- Tailwind CSS untuk Desain Modern -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & ReactDOM -->
@@ -76,7 +76,7 @@
             const [scanBarcode, setScanBarcode] = useState('');
             const [scanType, setScanType] = useState('IN');
             const [adjustDir, setAdjustDir] = useState('MINUS');
-            const [scanQty, setScanQty] = useState(''); // DIUBAH: Default dikosongkan agar ketik angka lebih mudah
+            const [scanQty, setScanQty] = useState('');
             const [scanUom, setScanUom] = useState('Bungkus');
             const [scanNote, setScanNote] = useState('');
             
@@ -432,8 +432,23 @@
             const simpanScan = async (e) => {
                 e.preventDefault();
                 if(syncRef.current || !detectedItem) return;
+
+                // --- VALIDASI STOK MINUS SAAT BARANG KELUAR ---
+                const isOutgoing = scanType === 'OUT' || (scanType === 'ADJUST' && adjustDir === 'MINUS');
+                if (isOutgoing) {
+                    let qtyBase = Number(scanQty);
+                    if (scanUom === 'Bal') qtyBase = Number(scanQty) * detectedItem.isiSlop * detectedItem.isiBal;
+                    if (scanUom === 'Slop') qtyBase = Number(scanQty) * detectedItem.isiSlop;
+                    
+                    if (qtyBase > detectedItem.stok) {
+                        setCustomAlert(`⚠️ Gagal menyimpan! Stok ${detectedItem.name} tidak mencukupi untuk transaksi ini. (Sisa: ${detectedItem.stok} Bks)`);
+                        return; // Hentikan fungsi di sini
+                    }
+                }
+                // ----------------------------------------------
+
                 const payload = { action: 'scan', barcode: detectedItem.id, type: scanType === 'ADJUST' ? (adjustDir === 'MINUS' ? 'OUT' : 'IN') : scanType, qty: scanQty, uom: scanUom, user: currentUser, note: scanType === 'ADJUST' ? `ADJUST: ${scanNote}` : '' };
-                setScanBarcode(''); setScanQty(''); setScanNote(''); setDetectedItem(null); setScanSuggestions([]); // DIUBAH: Reset dikosongkan
+                setScanBarcode(''); setScanQty(''); setScanNote(''); setDetectedItem(null); setScanSuggestions([]); 
                 await apiCall(payload);
             };
 
@@ -456,7 +471,6 @@
                 const payload = { action: 'opname', barcode: item.id, qty: qty, uom: uom, user: currentUser };
                 setInlineOpnameQty(prev => ({ ...prev, [item.id]: '' }));
                 await apiCall(payload);
-                // Tidak ada popup peringatan (Mode Cepat)
             };
 
             const simpanMaster = async (e) => {
@@ -520,8 +534,8 @@
                         </div>
                         <div className="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-2xl w-full max-w-md border border-slate-200 z-10 fade-in text-center text-slate-800">
                             <div className="flex justify-center mb-8"><div className="bg-indigo-600 p-5 rounded-[1.5rem] text-white shadow-xl shadow-indigo-200"><Icon name="shield-check" size={36}/></div></div>
-                            <h1 className="text-2xl font-black tracking-tighter uppercase italic">Grosir Pintar</h1>
-                            <p className="text-slate-500 mb-8 text-[10px] font-bold tracking-[0.3em] uppercase mt-1">Enterprise Hub v2.5</p>
+                            <h1 className="text-2xl font-black tracking-tighter uppercase italic">Toko Bebeng</h1>
+                            <p className="text-slate-500 mb-8 text-[10px] font-bold tracking-[0.2em] uppercase mt-1">Jln Kosambi No 8 Bandung</p>
                             {isCheckingSystem ? <div className="py-8"><Icon name="refresh-cw" className="animate-spin text-indigo-500 mx-auto" size={28}/><p className="mt-4 font-bold text-slate-500 uppercase text-[10px]">Memuat Database...</p></div> : (
                                 <form onSubmit={handleLogin} className="space-y-5 text-left">
                                     <div className="space-y-1.5">
@@ -548,8 +562,8 @@
                     <aside className={`absolute md:relative z-50 w-64 h-full bg-indigo-950 text-white flex flex-col shadow-2xl transition-transform duration-500 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} shrink-0`}>
                         <div className="p-6 border-b border-white/5 flex flex-col items-center">
                             <Icon name="warehouse" size={36} className="text-indigo-400 mb-3" />
-                            <h1 className="font-black text-xl italic tracking-tighter">GROSIR PINTAR</h1>
-                            <p className="text-[9px] font-bold text-indigo-400/70 uppercase tracking-[0.3em] mt-1">Sistem Terpadu</p>
+                            <h1 className="font-black text-xl italic tracking-tighter">TOKO BEBENG</h1>
+                            <p className="text-[9px] font-bold text-indigo-400/70 uppercase tracking-[0.2em] mt-1 text-center leading-relaxed">Jln Kosambi No 8 Bandung</p>
                         </div>
                         <nav className="flex-1 py-6 px-4 space-y-2 overflow-y-auto no-scrollbar">
                             {menuList.map(m => (
@@ -678,7 +692,7 @@
                                                                 <input required type="number" min="1" placeholder="Qty" value={scanQty} onChange={(e)=>setScanQty(e.target.value)} className="w-20 px-2 py-3 bg-slate-50 border border-slate-200 rounded-xl text-center font-black text-lg outline-none shadow-inner" />
                                                                 <div className="w-24 relative">
                                                                     <select value={scanUom} onChange={(e)=>setScanUom(e.target.value)} className="w-full h-full px-3 py-3 bg-white border border-slate-200 rounded-xl font-bold text-[10px] text-slate-700 outline-none cursor-pointer appearance-none shadow-sm">
-                                                                        <option value="Bungkus">Bks</option><option value="Slop">Pak</option><option value="Bal">Bal</option>
+                                                                        <option value="Bungkus">Bks</option><option value="Slop">Slop</option><option value="Bal">Bal</option>
                                                                     </select>
                                                                     <Icon name="chevron-right" className="absolute right-2 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" size={14}/>
                                                                 </div>
@@ -802,7 +816,7 @@
                                                                         value={inlineOpnameQty[item.id] !== undefined ? inlineOpnameQty[item.id] : ''} onChange={(e) => handleInlineOpnameChange(item.id, e.target.value)} />
                                                                     <select value={inlineOpnameUom[item.id] || 'Bal'} onChange={(e) => setInlineOpnameUom(prev => ({...prev, [item.id]: e.target.value}))}
                                                                         className="w-16 bg-white border border-slate-200 py-2 px-1 rounded-lg font-bold text-[10px] text-slate-700 outline-none cursor-pointer appearance-none text-center shadow-sm">
-                                                                        <option value="Bal">BAL</option><option value="Slop">PAK</option><option value="Bungkus">BKS</option>
+                                                                        <option value="Bal">BAL</option><option value="Slop">SLOP</option><option value="Bungkus">BKS</option>
                                                                     </select>
                                                                     <button onClick={() => simpanInlineOpname(item)} disabled={inlineOpnameQty[item.id] === undefined || inlineOpnameQty[item.id] === '' || isSyncing}
                                                                         className="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700 disabled:opacity-20 transition-all shadow-sm"><Icon name="save" size={16} /></button>
@@ -841,7 +855,7 @@
                                             </div>
                                             <span className="text-[10px] font-bold text-slate-400">Total: {processedMasterData.length}</span>
                                         </div>
-                                        <div className="overflow-y-auto flex-1 no-scrollbar">
+                                        <div className="overflow-x-auto flex-1 no-scrollbar">
                                             <table className="w-full text-left min-w-[700px]">
                                                 <thead className="bg-slate-50 text-[9px] font-black uppercase text-slate-500 border-b border-slate-200 sticky top-0 z-10">
                                                     <tr><th className="px-4 py-3">PRODUK</th><th className="px-4 py-3">BARCODE</th><th className="px-4 py-3 text-center">KONVERSI</th><th className="px-4 py-3 text-right">STOK</th><th className="px-4 py-3 text-center">AKSI</th></tr>
@@ -850,8 +864,8 @@
                                                     {currentMasterItems.map((item, idx) => (
                                                         <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
                                                             <td className="px-4 py-3 font-bold text-slate-800 text-sm">{item.name}<br/><span className="text-[9px] text-indigo-400 uppercase tracking-widest">{item.id}</span></td>
-                                                            <td className="px-4 py-3 font-mono text-[9px] text-slate-500 leading-relaxed">Bks: {item.bBungkus}<br/>Pak: {item.bSlop || '-'}<br/>Bal: {item.bBal || '-'}</td>
-                                                            <td className="px-4 py-3 text-center"><span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-lg uppercase whitespace-nowrap">1 Bal = {item.isiBal} Pak x {item.isiSlop} Bks</span></td>
+                                                            <td className="px-4 py-3 font-mono text-[9px] text-slate-500 leading-relaxed">Bks: {item.bBungkus}<br/>Slop: {item.bSlop || '-'}<br/>Bal: {item.bBal || '-'}</td>
+                                                            <td className="px-4 py-3 text-center"><span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-lg uppercase whitespace-nowrap">1 Bal = {item.isiBal} Slop x {item.isiSlop} Bks</span></td>
                                                             <td className="px-4 py-3 text-right font-black text-base text-slate-800">{item.stok} <span className="text-[9px] text-slate-400 font-bold">BKS</span><br/><span className="text-[9px] text-emerald-600 font-bold whitespace-nowrap">{getStokInfo(item.stok, item.isiSlop, item.isiBal)}</span></td>
                                                             <td className="px-4 py-3 text-center space-x-2 whitespace-nowrap">
                                                                 <button onClick={()=>{
@@ -1034,7 +1048,7 @@
                                         </div>
 
                                         <div className="relative">
-                                            <input value={newMaster.barcodeSlop} onChange={e=>setNewMaster({...newMaster, barcodeSlop: e.target.value})} placeholder="Barcode Pak" className="w-full pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-lg font-mono text-xs outline-none focus:border-indigo-400 shadow-sm" />
+                                            <input value={newMaster.barcodeSlop} onChange={e=>setNewMaster({...newMaster, barcodeSlop: e.target.value})} placeholder="Barcode Slop" className="w-full pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-lg font-mono text-xs outline-none focus:border-indigo-400 shadow-sm" />
                                             <button type="button" onClick={() => { setScannerTarget('master_slop'); setIsScannerOpen(true); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 hover:text-indigo-800 bg-indigo-50 p-1.5 rounded-md transition-all"><Icon name="camera" size={16}/></button>
                                         </div>
 
@@ -1044,8 +1058,8 @@
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1.5 text-center"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">1 Pak = .. Bks</label><input type="number" value={newMaster.isiSlop} onChange={e=>setNewMaster({...newMaster, isiSlop: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-center font-black text-lg outline-none focus:border-indigo-400" /></div>
-                                        <div className="space-y-1.5 text-center"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">1 Bal = .. Pak</label><input type="number" value={newMaster.isiBal} onChange={e=>setNewMaster({...newMaster, isiBal: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-center font-black text-lg outline-none focus:border-indigo-400" /></div>
+                                        <div className="space-y-1.5 text-center"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">1 Slop = .. Bks</label><input type="number" value={newMaster.isiSlop} onChange={e=>setNewMaster({...newMaster, isiSlop: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-center font-black text-lg outline-none focus:border-indigo-400" /></div>
+                                        <div className="space-y-1.5 text-center"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">1 Bal = .. Slop</label><input type="number" value={newMaster.isiBal} onChange={e=>setNewMaster({...newMaster, isiBal: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-center font-black text-lg outline-none focus:border-indigo-400" /></div>
                                     </div>
                                 </div>
                                 <div className="p-6 border-t border-slate-100 bg-white shrink-0"><button onClick={simpanMaster} disabled={isSyncing} className="w-full bg-slate-900 text-white font-black py-4 rounded-xl uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50 text-xs">Simpan Database</button></div>
